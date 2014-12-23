@@ -106,6 +106,8 @@ private:
 		ptr<Material> material;
 		ptr<Physics::Shape> shape;
 		float mass;
+		float linearDamping;
+		float angularDamping;
 		float rotorSpeed;
 		float minRotorForce, maxRotorForce;
 		float rotorForceChangeRate;
@@ -115,6 +117,8 @@ private:
 		float rotorRollControlBound;
 		float rotorPitchControlCoef;
 		float rotorRollControlCoef;
+		vec3 cameraOffset;
+		float cameraSpeedCoef;
 	} bansheeParams;
 
 	class Banshee;
@@ -168,6 +172,8 @@ public:
 		ptr<Material> material,
 		ptr<Physics::Shape> shape,
 		float mass,
+		float linearDamping,
+		float angularDamping,
 		float rotorSpeed,
 		float minRotorForce,
 		float maxRotorForce,
@@ -177,7 +183,9 @@ public:
 		float rotorPitchControlMax,
 		float rotorRollControlBound,
 		float rotorPitchControlCoef,
-		float rotorRollControlCoef
+		float rotorRollControlCoef,
+		const vec3& cameraOffset,
+		float cameraSpeedCoef
 	);
 	ptr<Banshee> CreateBanshee(const mat4x4& initialTransform);
 

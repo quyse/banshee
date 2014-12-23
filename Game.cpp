@@ -10,6 +10,8 @@
 #include "../inanity/inanity-sqlitefs.hpp"
 #endif
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 
 Game* Game::singleGame = 0;
 
@@ -45,6 +47,7 @@ public:
 	{
 		rigidBody = game->physicsWorld->CreateRigidBody(game->bansheeParams.shape, game->bansheeParams.mass, initialTransform);
 		rigidBody->DisableDeactivation();
+		rigidBody.StaticCast<Physics::BtRigidBody>()->GetInternalObject()->setDamping(game->bansheeParams.linearDamping, game->bansheeParams.angularDamping);
 		game->banshees.insert(this);
 	}
 
@@ -92,21 +95,27 @@ public:
 
 		mat4x4 transform = GetTransform();
 		mat4x4 leftActualRotorTransform = transform * leftRotorTransform * QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), leftRotorPitch));
-		vec4 leftRotorDir = leftRotorTransform * vec4(0, 0, 1, 0);
+		vec4 leftRotorDir = leftActualRotorTransform * vec4(0, 0, 1, 0);
+		leftRotorDir = normalize(leftRotorDir);
 		mat4x4 rightActualRotorTransform = transform * rightRotorTransform * QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), rightRotorPitch));
-		vec4 rightRotorDir = rightRotorTransform * vec4(0, 0, 1, 0);
+		vec4 rightRotorDir = rightActualRotorTransform * vec4(0, 0, 1, 0);
+		rightRotorDir = normalize(rightRotorDir);
 
 		leftRotorForce = relax(leftRotorForce, desiredLeftRotorForce, frameTime * game->bansheeParams.rotorForceChangeRate);
 		rightRotorForce = relax(rightRotorForce, desiredRightRotorForce, frameTime * game->bansheeParams.rotorForceChangeRate);
 
-		char s[100];
-		sprintf(s, "%.3f %.3f %.3f %.3f", desiredLeftRotorForce, desiredRightRotorForce, desiredLeftRotorPitch, desiredRightRotorPitch);
-		bansheeDebug = s;
+		vec3 leftForce = vec3(leftRotorDir.x, leftRotorDir.y, leftRotorDir.z) * leftRotorForce;
+		rigidBody->ApplyForce(leftForce, vec3(leftActualRotorTransform(0, 3), leftActualRotorTransform(1, 3), leftActualRotorTransform(2, 3)));
+		vec3 rightForce = vec3(rightRotorDir.x, rightRotorDir.y, rightRotorDir.z) * rightRotorForce;
+		rigidBody->ApplyForce(rightForce, vec3(rightActualRotorTransform(0, 3), rightActualRotorTransform(1, 3), rightActualRotorTransform(2, 3)));
 
-		rigidBody->ApplyForce(vec3(leftRotorDir.x, leftRotorDir.y, leftRotorDir.z) * leftRotorForce,
-			vec3(leftActualRotorTransform(0, 3), leftActualRotorTransform(1, 3), leftActualRotorTransform(2, 3)));
-		rigidBody->ApplyForce(vec3(rightRotorDir.x, rightRotorDir.y, rightRotorDir.z) * rightRotorForce,
-			vec3(rightActualRotorTransform(0, 3), rightActualRotorTransform(1, 3), rightActualRotorTransform(2, 3)));
+		std::ostringstream s;
+		s << std::fixed << std::setprecision(3)
+			<< "(" << leftRotorDir << ") "
+			<< "(" << rightRotorDir << ") "
+			<< "(" << leftForce << ") "
+			<< "(" << rightForce << ")";
+		bansheeDebug = s.str();
 
 		leftRotorAngle += leftRotorForce * game->bansheeParams.rotorSpeed * frameTime;
 		rightRotorAngle += rightRotorForce * game->bansheeParams.rotorSpeed * frameTime;
@@ -473,7 +482,6 @@ void Game::Tick()
 
 	mat4x4 heroTransform = hero->GetTransform();
 	vec3 heroPosition(heroTransform(0, 3), heroTransform(1, 3), heroTransform(2, 3));
-	quat heroOrientation = axis_rotation(vec3(0, 0, 1), cameraAlpha);
 
 	if(cameraMode)
 	{
@@ -481,7 +489,14 @@ void Game::Tick()
 	}
 	else
 	{
-		cameraPosition = heroPosition - normalize(heroPosition - cameraPosition) * 5.0f;
+		vec4 desiredCameraPosition = heroTransform * bansheeParams.cameraOffset;
+	#if 0
+		cameraPosition = cameraPosition
+			+ (vec3(desiredCameraPosition.x, desiredCameraPosition.y, desiredCameraPosition.z) - cameraPosition)
+			* (1.0f - exp(frameTime * bansheeParams.cameraSpeedCoef));
+	#else
+		cameraPosition = vec3(desiredCameraPosition.x, desiredCameraPosition.y, desiredCameraPosition.z);
+	#endif
 		cameraDirection = normalize(heroPosition - cameraPosition);
 	}
 
@@ -684,6 +699,8 @@ void Game::SetBansheeParams(
 	ptr<Material> material,
 	ptr<Physics::Shape> shape,
 	float mass,
+	float linearDamping,
+	float angularDamping,
 	float rotorSpeed,
 	float minRotorForce,
 	float maxRotorForce,
@@ -693,7 +710,9 @@ void Game::SetBansheeParams(
 	float rotorPitchControlMax,
 	float rotorRollControlBound,
 	float rotorPitchControlCoef,
-	float rotorRollControlCoef
+	float rotorRollControlCoef,
+	const vec3& cameraOffset,
+	float cameraSpeedCoef
 )
 {
 	bansheeParams.mainGeometry = mainGeometry;
@@ -704,6 +723,8 @@ void Game::SetBansheeParams(
 	bansheeParams.material = material;
 	bansheeParams.shape = shape;
 	bansheeParams.mass = mass;
+	bansheeParams.linearDamping = linearDamping;
+	bansheeParams.angularDamping = angularDamping;
 	bansheeParams.rotorSpeed = rotorSpeed;
 	bansheeParams.minRotorForce = minRotorForce;
 	bansheeParams.maxRotorForce = maxRotorForce;
@@ -714,6 +735,8 @@ void Game::SetBansheeParams(
 	bansheeParams.rotorRollControlBound = rotorRollControlBound;
 	bansheeParams.rotorPitchControlCoef = rotorPitchControlCoef;
 	bansheeParams.rotorRollControlCoef = rotorRollControlCoef;
+	bansheeParams.cameraOffset = cameraOffset;
+	bansheeParams.cameraSpeedCoef = cameraSpeedCoef;
 }
 
 ptr<Game::Banshee> Game::CreateBanshee(const mat4x4& initialTransform)

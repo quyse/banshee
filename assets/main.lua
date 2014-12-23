@@ -65,7 +65,8 @@ local bansheeMaterial = Banshee.Material()
 --bansheeMaterial:SetDiffuseTexture(game:LoadTexture("/nescafe.png"))
 bansheeMaterial:SetDiffuse({0.5, 0.5, 0.5, 1});
 bansheeMaterial:SetSpecular({0.5, 0, 0, 0})
-local bansheeShape = game:CreatePhysicsBoxShape({1,1,1})
+local bansheeShape = game:CreatePhysicsBoxShape({5,5,1})
+-- local bansheeShape = game:CreatePhysicsSphereShape(1)
 game:SetBansheeParams(bansheeMainGeometry
 	, bansheeLeftWingGeometry
 	, bansheeRightWingGeometry
@@ -74,16 +75,20 @@ game:SetBansheeParams(bansheeMainGeometry
 	, bansheeMaterial
 	, bansheeShape
 	, 9 -- mass
+	, 0.5 -- linear damping
+	, 0.9 -- angular damping
 	, 1 -- rotorSpeed
-	, 10 -- min rotor force
-	, 10000 -- max rotor force
-	, 2000 -- rotorForceChangeRate
-	, 5 -- rotorPitchChangeRate
+	, 40 -- min rotor force
+	, 60 -- max rotor force
+	, 10 -- rotorForceChangeRate
+	, 0.5 -- rotorPitchChangeRate
 	, -1  -- rotorPitchControlMin
 	, 1   -- rotorPitchControlMax
 	, 1  -- rotorRollControlBound
-	, 0.5 -- rotorPitchControlCoef,
+	, 0.5 -- rotorPitchControlCoef
 	, 0.5 -- rotorRollControlCoef
+	, {0, -10, 2} -- cameraOffset
+	, -5
 )
 
 game:PlaceHero({10, 10, 10})
