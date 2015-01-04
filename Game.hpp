@@ -61,6 +61,7 @@ private:
 	float alpha;
 
 	ptr<Material> decalMaterial;
+	ptr<Material> debugMaterial;
 
 	struct StaticModel
 	{
@@ -109,7 +110,7 @@ private:
 		float linearDamping;
 		float angularDamping;
 		float rotorSpeed;
-		float minRotorForce, maxRotorForce;
+		float minRotorForce, normalRotorForce, maxRotorForce;
 		float rotorForceChangeRate;
 		float rotorPitchChangeRate;
 		float rotorPitchControlMin;
@@ -117,8 +118,10 @@ private:
 		float rotorRollControlBound;
 		float rotorPitchControlCoef;
 		float rotorRollControlCoef;
+		vec3 lookOffset;
 		vec3 cameraOffset;
 		float cameraSpeedCoef;
+		vec3 cubeSize;
 	} bansheeParams;
 
 	class Banshee;
@@ -131,6 +134,8 @@ private:
 	vec3 ambientColor;
 
 	float bloomLimit, toneLuminanceKey, toneMaxLuminance;
+
+	ptr<Geometry> cubeGeometry;
 
 	/// Скрипт.
 	ptr<Script::State> scriptState;
@@ -155,13 +160,16 @@ public:
 	ptr<BoneAnimation> LoadBoneAnimation(const String& fileName, ptr<Skeleton> skeleton);
 	ptr<Physics::Shape> CreatePhysicsBoxShape(const vec3& halfSize);
 	ptr<Physics::Shape> CreatePhysicsSphereShape(float radius);
+	ptr<Physics::Shape> CreatePhysicsCompoundShape(ptr<Script::Any> anyShapes);
 	ptr<Physics::RigidBody> CreatePhysicsRigidBody(ptr<Physics::Shape> physicsShape, float mass, const vec3& position);
 	void AddStaticModel(ptr<Geometry> geometry, ptr<Material> material, const vec3& position);
+	void AddStaticModelWithScale(ptr<Geometry> geometry, ptr<Material> material, const vec3& position, const vec3& scale);
 	void AddRigidModel(ptr<Geometry> geometry, ptr<Material> material, ptr<Physics::RigidBody> physicsRigidBody);
 	void AddStaticRigidBody(ptr<Physics::RigidBody> rigidBody);
 	ptr<StaticLight> AddStaticLight();
 
 	void SetAmbient(const vec3& color);
+	void SetBackgroundTexture(ptr<Texture> texture);
 
 	void SetBansheeParams(
 		ptr<Geometry> mainGeometry,
@@ -176,6 +184,7 @@ public:
 		float angularDamping,
 		float rotorSpeed,
 		float minRotorForce,
+		float normalRotorForce,
 		float maxRotorForce,
 		float rotorForceChangeRate,
 		float rotorPitchChangeRate,
@@ -184,13 +193,18 @@ public:
 		float rotorRollControlBound,
 		float rotorPitchControlCoef,
 		float rotorRollControlCoef,
+		const vec3& lookOffset,
 		const vec3& cameraOffset,
-		float cameraSpeedCoef
+		float cameraSpeedCoef,
+		const vec3& cubeSize
 	);
 	ptr<Banshee> CreateBanshee(const mat4x4& initialTransform);
 
 	void PlaceHero(const vec3& position);
 	void PlaceCamera(const vec3& position, float alpha, float beta);
+
+	void SetCubeGeometry(ptr<Geometry> cubeGeometry);
+	void SetDebugMaterial(ptr<Material> debugMaterial);
 
 	META_DECLARE_CLASS(Game);
 };

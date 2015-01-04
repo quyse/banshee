@@ -107,8 +107,8 @@ private:
 	/// Форматы геометрии.
 	ptr<GeometryFormats> geometryFormats;
 
-	/// Текстура окружения.
-	ptr<Texture> environmentTexture;
+	/// Текстура background.
+	ptr<Texture> backgroundTexture;
 
 	/// Максимальное количество источников света без теней.
 	static const int maxBasicLightsCount = 4;
@@ -164,8 +164,8 @@ private:
 	Sampler<vec4, 2> uSpecularSampler;
 	/// Семплер карты нормалей.
 	Sampler<vec3, 2> uNormalSampler;
-	/// Семплер текстуры окружения.
-	SamplerCube<vec3> uEnvironmentSampler;
+	/// Семплер текстуры background.
+	Sampler<vec3, 2> uBackgroundSampler;
 
 	///*** Uniform-группа модели.
 	ptr<UniformGroup> ugModel;
@@ -238,13 +238,14 @@ private:
 	ptr<PixelShader> psDownsample;
 	ptr<PixelShader> psDownsampleLuminanceFirst;
 	ptr<PixelShader> psDownsampleLuminance;
-	ptr<PixelShader> psBloomLimit, psBloom1, psBloom2, psTone;
+	ptr<PixelShader> psBloomLimit, psBloom1, psBloom2, psTone, psBackground;
 
 	ptr<SamplerState> ssPoint;
 	ptr<SamplerState> ssLinear;
 	ptr<SamplerState> ssPointBorder;
 	ptr<SamplerState> ssColorTexture;
 
+	ptr<BlendState> bsTransparent;
 	ptr<BlendState> bsLastDownsample;
 
 	ptr<PixelShader> psShadow;
@@ -351,6 +352,9 @@ private:
 	};
 	std::vector<Model> models;
 
+	/// Полупрозрачные модели для рисования.
+	std::vector<Model> transparentModels;
+
 	/// Skinned модель для рисования.
 	struct SkinnedModel
 	{
@@ -400,13 +404,15 @@ public:
 	void SetCamera(const mat4x4& cameraViewProj, const vec3& cameraPosition);
 	/// Зарегистрировать модель.
 	void AddModel(ptr<Material> material, ptr<Geometry> geometry, const mat4x4& worldTransform);
+	/// Зарегистрировать полупрозрачную модель.
+	void AddTransparentModel(ptr<Material> material, ptr<Geometry> geometry, const mat4x4& worldTransform);
 	/// Зарегистрировать skinned-модель.
 	void AddSkinnedModel(ptr<Material> material, ptr<Geometry> geometry, ptr<BoneAnimationFrame> animationFrame);
 	void AddSkinnedModel(ptr<Material> material, ptr<Geometry> geometry, ptr<Geometry> shadowGeometry, ptr<BoneAnimationFrame> animationFrame);
 	/// Установить рассеянный свет.
 	void SetAmbientColor(const vec3& ambientColor);
-	/// Установить текстуру окружения.
-	void SetEnvironmentTexture(ptr<Texture> environmentTexture);
+	/// Установить текстуру background.
+	void SetBackgroundTexture(ptr<Texture> backgroundTexture);
 	/// Зарегистрировать простой источник света.
 	void AddBasicLight(const vec3& position, const vec3& color);
 	/// Зарегистрировать источник света с тенью.

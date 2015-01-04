@@ -137,7 +137,8 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 	uDiffuseSampler(0),
 	uSpecularSampler(1),
 	uNormalSampler(2),
-	uEnvironmentSampler(3),
+
+	uBackgroundSampler(0),
 
 	ugModel(NEW(UniformGroup(3))),
 	uWorld(ugModel->AddUniform<mat4x4>()),
@@ -291,11 +292,13 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 	{
 		// промежуточные
 		Interpolant<vec2> iTexcoord(0);
+		Interpolant<vec2> iPosition(1);
 
 		// вершинный шейдер - общий для всех постпроцессингов
 		vsFilter = shaderCache->GetVertexShader((
 			setPosition(quad.aPosition),
-			iTexcoord.Set(screenToTexture(quad.aPosition["xy"]))
+			iTexcoord.Set(screenToTexture(quad.aPosition["xy"])),
+			iPosition.Set(quad.aPosition["xy"])
 			));
 
 		// пиксельный шейдер для размытия тени
@@ -378,14 +381,31 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 		// шейдер tone mapping
 		{
 			Value<vec3> color = uToneScreenSampler.Sample(iTexcoord) + uToneBloomSampler.Sample(iTexcoord);
-			Value<float> luminance = dot(color, newvec3(0.2126f, 0.7152f, 0.0722f));
-			Value<float> relativeLuminance = uToneLuminanceKey * luminance / exp(uToneAverageSampler.Sample(newvec2(0.5f, 0.5f)));
-			Value<float> intensity = relativeLuminance * (Value<float>(1) + relativeLuminance / uToneMaxLuminance) / (Value<float>(1) + relativeLuminance);
-			color = saturate(color * (intensity / luminance));
+			if(0)
+			{
+				Value<float> luminance = dot(color, newvec3(0.2126f, 0.7152f, 0.0722f));
+				Value<float> relativeLuminance = uToneLuminanceKey * luminance / exp(uToneAverageSampler.Sample(newvec2(0.5f, 0.5f)));
+				Value<float> intensity = relativeLuminance * (Value<float>(1) + relativeLuminance / uToneMaxLuminance) / (Value<float>(1) + relativeLuminance);
+				color = saturate(color * (intensity / luminance));
+			}
 			// гамма-коррекция
 			color = pow(color, newvec3(0.45f, 0.45f, 0.45f));
 			psTone = shaderCache->GetPixelShader(
 				fragment(0, newvec4(color, 1.0f))
+			);
+		}
+
+		// шейдер background
+		{
+			Value<vec4> projPosition = mul(uInvViewProj, newvec4(iPosition, 1.0f, 1.0f));
+			Value<vec3> worldPosition = projPosition["xyz"] / projPosition["w"] - uCameraPosition;
+			Value<vec3> color = uBackgroundSampler.Sample(
+				newvec2(
+					atan2(worldPosition["y"], worldPosition["x"]) * val(0.5f / 3.1415926535897932f) + val(0.5f),
+					atan2(worldPosition["z"], sqrt(worldPosition["x"] * worldPosition["x"] + worldPosition["y"] * worldPosition["y"])) * val(3.0f * 0.5f / 3.1415926535897932f) + val(0.5f)
+					));
+			psBackground = shaderCache->GetPixelShader(
+				fragment(0, newvec4(pow(color, val(2.2f)), 1.0f))
 			);
 		}
 
@@ -418,6 +438,9 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 		fbShadowBlur1 = device->CreateFrameBuffer();
 		fbShadowBlur1->SetColorBuffer(0, rbShadowBlur);
 
+		// blend state для полупрозрачности
+		bsTransparent = device->CreateBlendState();
+		bsTransparent->SetColor(BlendState::colorSourceSrcAlpha, BlendState::colorSourceInvSrcAlpha, BlendState::operationAdd);
 		// для последнего прохода - специальный blend state
 		bsLastDownsample = device->CreateBlendState();
 		bsLastDownsample->SetColor(BlendState::colorSourceSrcAlpha, BlendState::colorSourceInvSrcAlpha, BlendState::operationAdd);
@@ -569,7 +592,7 @@ void Painter::BeginMaterialLighting(const PixelShaderKey& key, Value<vec3> ambie
 		tmpNormal = normalize(iNormal);
 
 	tmpToCamera = normalize(uCameraPosition - iWorldPosition);
-	tmpDiffuse = key.materialKey.hasDiffuseTexture ? uDiffuseSampler.Sample(tmpTexcoord) : uDiffuse;
+	tmpDiffuse = key.materialKey.hasDiffuseTexture ? pow(uDiffuseSampler.Sample(tmpTexcoord), val(2.2f)) : uDiffuse;
 	tmpSpecular = key.materialKey.hasSpecularTexture ? uSpecularSampler.Sample(tmpTexcoord) : uSpecular;
 	tmpSpecularExponent = exp2(tmpSpecular["x"] * val(4.0f/*12.0f*/));
 	tmpColor = ambientColor * tmpDiffuse["xyz"];
@@ -709,6 +732,7 @@ void Painter::BeginFrame(float frameTime)
 	this->frameTime = frameTime;
 
 	models.clear();
+	transparentModels.clear();
 	skinnedModels.clear();
 	lights.clear();
 }
@@ -723,6 +747,11 @@ void Painter::SetCamera(const mat4x4& cameraViewProj, const vec3& cameraPosition
 void Painter::AddModel(ptr<Material> material, ptr<Geometry> geometry, const mat4x4& worldTransform)
 {
 	models.push_back(Model(material, geometry, worldTransform));
+}
+
+void Painter::AddTransparentModel(ptr<Material> material, ptr<Geometry> geometry, const mat4x4& worldTransform)
+{
+	transparentModels.push_back(Model(material, geometry, worldTransform));
 }
 
 void Painter::AddSkinnedModel(ptr<Material> material, ptr<Geometry> geometry, ptr<BoneAnimationFrame> animationFrame)
@@ -740,9 +769,9 @@ void Painter::SetAmbientColor(const vec3& ambientColor)
 	this->ambientColor = ambientColor;
 }
 
-void Painter::SetEnvironmentTexture(ptr<Texture> environmentTexture)
+void Painter::SetBackgroundTexture(ptr<Texture> backgroundTexture)
 {
-	this->environmentTexture = environmentTexture;
+	this->backgroundTexture = backgroundTexture;
 }
 
 void Painter::AddBasicLight(const vec3& position, const vec3& color)
@@ -988,6 +1017,23 @@ void Painter::Draw()
 		context->ClearColor(1, vec4(0, 0, 0, 1)); // normal
 		context->ClearDepth(1.0f);
 
+		// нарисовать background
+		{
+			// общие для фильтров настройки
+			Context::LetAttributeBinding lab(context, abFilter);
+			Context::LetVertexBuffer lvb(context, 0, vbFilter);
+			Context::LetIndexBuffer lib(context, ibFilter);
+			Context::LetVertexShader lvs(context, vsFilter);
+			Context::LetDepthTestFunc ldtf(context, Context::depthTestFuncAlways);
+			Context::LetDepthWrite ldw(context, false);
+
+			Context::LetUniformBuffer lubCamera(context, ugCamera);
+			Context::LetSampler lsBackground(context, uBackgroundSampler, backgroundTexture, ssColorTexture);
+			Context::LetPixelShader lps(context, psBackground);
+
+			context->Draw();
+		}
+
 		//** нарисовать простые модели
 		{
 			std::sort(models.begin(), models.end(), Sorter());
@@ -1016,7 +1062,6 @@ void Painter::Draw()
 				Context::LetSampler lsDiffuse(context, uDiffuseSampler, material->diffuseTexture, ssColorTexture);
 				Context::LetSampler lsSpecular(context, uSpecularSampler, material->specularTexture, ssColorTexture);
 				Context::LetSampler lsNormal(context, uNormalSampler, material->normalTexture, ssColorTexture);
-				Context::LetSampler lsEnvironment(context, uEnvironmentSampler, environmentTexture, ssColorTexture);
 				uDiffuse.Set(material->diffuse);
 				uSpecular.Set(material->specular);
 				uNormalCoordTransform.Set(material->normalCoordTransform);
@@ -1079,7 +1124,6 @@ void Painter::Draw()
 				Context::LetSampler lsDiffuse(context, uDiffuseSampler, material->diffuseTexture, ssColorTexture);
 				Context::LetSampler lsSpecular(context, uSpecularSampler, material->specularTexture, ssColorTexture);
 				Context::LetSampler lsNormal(context, uNormalSampler, material->normalTexture, ssColorTexture);
-				Context::LetSampler lsEnvironment(context, uEnvironmentSampler, environmentTexture, ssColorTexture);
 				uDiffuse.Set(material->diffuse);
 				uSpecular.Set(material->specular);
 				uNormalCoordTransform.Set(material->normalCoordTransform);
@@ -1111,6 +1155,75 @@ void Painter::Draw()
 
 				// нарисовать
 				context->Draw();
+			}
+		}
+
+		//** нарисовать простые полупрозрачные модели
+		{
+			std::sort(transparentModels.begin(), transparentModels.end(), Sorter());
+
+			// установить привязку атрибутов
+			Context::LetAttributeBinding lab(context, abInstanced);
+			// установить вершинный шейдер
+			Context::LetVertexShader lvs(context, GetVertexShader(VertexShaderKey(true, false)));
+			// установить константный буфер
+			Context::LetUniformBuffer lubModel(context, ugInstancedModel);
+			// установить материал
+			Context::LetUniformBuffer lubMaterial(context, ugMaterial);
+			// установить смешивание
+			Context::LetBlendState lbs(context, bsTransparent);
+
+			// нарисовать
+			for(size_t i = 0; i < transparentModels.size(); )
+			{
+				// выяснить размер батча по материалу
+				ptr<Material> material = transparentModels[i].material;
+				int materialBatchCount;
+				for(materialBatchCount = 1;
+					i + materialBatchCount < transparentModels.size() &&
+					material == transparentModels[i + materialBatchCount].material;
+					++materialBatchCount);
+
+				// установить параметры материала
+				Context::LetSampler lsDiffuse(context, uDiffuseSampler, material->diffuseTexture, ssColorTexture);
+				Context::LetSampler lsSpecular(context, uSpecularSampler, material->specularTexture, ssColorTexture);
+				Context::LetSampler lsNormal(context, uNormalSampler, material->normalTexture, ssColorTexture);
+				uDiffuse.Set(material->diffuse);
+				uSpecular.Set(material->specular);
+				uNormalCoordTransform.Set(material->normalCoordTransform);
+				ugMaterial->Upload(context);
+
+				// рисуем инстансингом обычные модели
+				// установить пиксельный шейдер
+				Context::LetPixelShader lps(context, GetPixelShader(PixelShaderKey(basicLightsCount, shadowLightsCount, material->GetKey())));
+				// цикл по батчам по геометрии
+				for(int j = 0; j < materialBatchCount; )
+				{
+					// выяснить размер батча по геометрии
+					ptr<Geometry> geometry = transparentModels[i + j].geometry;
+					int geometryBatchCount;
+					for(geometryBatchCount = 1;
+						geometryBatchCount < maxInstancesCount &&
+						j + geometryBatchCount < materialBatchCount &&
+						geometry == transparentModels[i + j + geometryBatchCount].geometry;
+						++geometryBatchCount);
+
+					// установить геометрию
+					Context::LetVertexBuffer lvb(context, 0, geometry->GetVertexBuffer());
+					Context::LetIndexBuffer lib(context, geometry->GetIndexBuffer());
+
+					// установить uniform'ы
+					for(int k = 0; k < geometryBatchCount; ++k)
+						uWorlds.Set(k, transparentModels[i + j + k].worldTransform);
+					ugInstancedModel->Upload(context);
+
+					// нарисовать
+					instancer->Draw(context, geometryBatchCount);
+
+					j += geometryBatchCount;
+				}
+
+				i += materialBatchCount;
 			}
 		}
 	}
