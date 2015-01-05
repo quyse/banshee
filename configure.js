@@ -51,7 +51,7 @@ var dynamicLibraries = {
 		'user32.lib', 'gdi32.lib', 'opengl32.lib', 'openal32.lib'
 	],
 	linux: [
-		'pthread', 'GL', 'dl', 'z', 'SDL2'
+		'pthread', 'GL', 'dl', 'z', 'SDL2', 'openal'
 	],
 	freebsd: [
 		'pthread', 'GL', 'X11', 'z', 'xcb', 'X11-xcb', 'SDL2'
@@ -65,7 +65,7 @@ exports.configureLinker = function(executableFile, linker) {
 	var a = /^(([^\/]+)\/)[^\/]+$/.exec(executableFile);
 	linker.configuration = a[2];
 
-	var objects = ['main', 'meta', 'Geometry', 'GeometryFormats', 'Material', 'Painter', 'Game', 'BoneAnimation', 'Skeleton'];
+	var objects = ['main', 'meta', 'Geometry', 'GeometryFormats', 'Material', 'Painter', 'Game', 'BoneAnimation', 'Skeleton', 'Camera'];
 	for ( var i = 0; i < objects.length; ++i)
 		linker.addObjectFile(a[1] + objects[i]);
 

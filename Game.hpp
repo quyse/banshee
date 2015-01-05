@@ -11,6 +11,7 @@ class Skeleton;
 class BoneAnimation;
 class BoneAnimationFrame;
 class Painter;
+class Camera;
 
 struct StaticLight : public Object
 {
@@ -56,6 +57,8 @@ private:
 	ptr<TextureManager> textureManager;
 	ptr<Gui::GrCanvas> canvas;
 	ptr<Gui::Font> font;
+
+	ptr<Camera> _camera;
 
 	vec3 cameraPosition;
 	float alpha;

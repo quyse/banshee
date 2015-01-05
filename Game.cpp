@@ -3,6 +3,7 @@
 #include "Geometry.hpp"
 #include "GeometryFormats.hpp"
 #include "Material.hpp"
+#include "Camera.hpp"
 #include "Skeleton.hpp"
 #include "BoneAnimation.hpp"
 #include "../inanity/script/lua/State.hpp"
@@ -457,9 +458,9 @@ void Game::Tick()
 			case Input::Event::Mouse::typeRawMove:
 				if(cameraMode)
 				{
-					cameraAlpha -= std::max(std::min(inputEvent.mouse.rawMoveX * 0.005f, maxAngleChange), -maxAngleChange);
-					cameraBeta -= std::max(std::min(inputEvent.mouse.rawMoveY * 0.005f, maxAngleChange), -maxAngleChange);
-					cameraAlpha -= std::max(std::min(inputEvent.mouse.rawMoveZ * 0.005f, maxAngleChange), -maxAngleChange);
+					cameraAlpha -= clamp(inputEvent.mouse.rawMoveX * 0.005f, -maxAngleChange, maxAngleChange);
+					cameraBeta -= clamp(inputEvent.mouse.rawMoveY * 0.005f, -maxAngleChange, maxAngleChange);
+					cameraAlpha -= clamp(inputEvent.mouse.rawMoveZ * 0.005f, -maxAngleChange, maxAngleChange);
 				}
 				else
 				{
@@ -526,25 +527,30 @@ void Game::Tick()
 	for(Banshees::iterator i = banshees.begin(); i != banshees.end(); ++i)
 		(*i)->Step(frameTime);
 
-	mat4x4 heroTransform = hero->GetTransform();
-	vec3 heroPosition(heroTransform(0, 3), heroTransform(1, 3), heroTransform(2, 3));
-
+	mat4x4 viewMatrix;
 	if(cameraMode)
 	{
 		cameraPosition += cameraMove * frameTime;
+		viewMatrix = CreateLookAtMatrix(cameraPosition, cameraPosition + cameraDirection, vec3(0, 0, 1));
 	}
 	else
 	{
-		vec4 desiredCameraPosition = heroTransform * bansheeParams.cameraOffset;
-	#if 1
-		cameraPosition = cameraPosition
-			+ (vec3(desiredCameraPosition.x, desiredCameraPosition.y, desiredCameraPosition.z) - cameraPosition)
-			* (1.0f - exp(frameTime * bansheeParams.cameraSpeedCoef));
-	#else
-		cameraPosition = vec3(desiredCameraPosition.x, desiredCameraPosition.y, desiredCameraPosition.z);
-	#endif
-		vec4 desiredCameraDirection = heroTransform * vec4(0, 1, 0, 0);
-		cameraDirection = vec3(desiredCameraDirection.x, desiredCameraDirection.y, desiredCameraDirection.z);
+
+		mat4x4 heroTransform = hero->GetTransform();
+
+		if(!_camera)
+		{
+			_camera = NEW(Camera(heroTransform, 0.1f, 8.f));
+		}
+
+		_camera->newTick(
+			heroTransform,
+			frameTime,
+			controlRoll / bansheeParams.rotorRollControlBound * pi / 6,
+			(controlPitch - bansheeParams.rotorPitchControlMin) / (bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin) * pi / 20 + pi/30);
+
+		cameraPosition = _camera->getCameraPosition();
+		viewMatrix = _camera->getViewMat();
 	}
 
 	alpha += frameTime;
@@ -553,7 +559,6 @@ void Game::Tick()
 	int screenHeight = presenter->GetHeight();
 	painter->Resize(screenWidth, screenHeight);
 
-	mat4x4 viewMatrix = CreateLookAtMatrix(cameraPosition, cameraPosition + cameraDirection, vec3(0, 0, 1));
 	mat4x4 projMatrix = CreateProjectionPerspectiveFovMatrix(3.1415926535897932f / 4, float(screenWidth) / float(screenHeight), 0.1f, 100.0f);
 
 	// зарегистрировать все объекты
