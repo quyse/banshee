@@ -404,9 +404,11 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 					atan2(worldPosition["y"], worldPosition["x"]) * val(0.5f / 3.1415926535897932f) + val(0.5f),
 					atan2(worldPosition["z"], sqrt(worldPosition["x"] * worldPosition["x"] + worldPosition["y"] * worldPosition["y"])) * val(3.0f * 0.5f / 3.1415926535897932f) + val(0.5f)
 					));
-			psBackground = shaderCache->GetPixelShader(
+			psBackground = shaderCache->GetPixelShader((
+				iTexcoord,
+				iPosition,
 				fragment(0, newvec4(pow(color, val(2.2f)), 1.0f))
-			);
+			));
 		}
 
 		// color texture sampler
