@@ -45,6 +45,8 @@ public:
 		rightRotorForce(game->bansheeParams.minRotorForce),
 		leftRotorAngle(0),
 		rightRotorAngle(0),
+		leftRotorPitch(0),
+		rightRotorPitch(0),
 		controlPitch(0),
 		controlRoll(0),
 		controlMaxForce(false),
@@ -66,10 +68,10 @@ public:
 		return rigidBody->GetTransform();
 	}
 
-	void Walk(const vec3& direction)
-	{
-		rigidBody->ApplyImpulse(direction, rigidBody->GetPosition());
-	}
+	// void Walk(const vec3& direction)
+	// {
+	// 	rigidBody->ApplyImpulse(direction, rigidBody->GetPosition());
+	// }
 
 	static float relax(float current, float target, float maxStep)
 	{
@@ -123,6 +125,8 @@ public:
 
 		std::ostringstream s;
 		s << std::fixed << std::setprecision(3)
+			<< "leftRotorPitch: " << leftRotorPitch << " "
+			<< "rightRotorPitch: " << rightRotorPitch << " "
 			<< "(" << leftRotorDir << ") "
 			<< "(" << rightRotorDir << ") "
 			<< "(" << leftForce << ") "
