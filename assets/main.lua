@@ -132,12 +132,12 @@ game:SetBansheeParams(bansheeMainGeometry
 	, 44 -- normal rotor force
 	, 90 -- max rotor force
 	, 20 -- rotorForceChangeRate
-	, 0.5 -- rotorPitchChangeRate
-	, -2  -- rotorPitchControlMin
-	, 2   -- rotorPitchControlMax
-	, 2  -- rotorRollControlBound
-	, 0.5 -- rotorPitchControlCoef
-	, 0.5 -- rotorRollControlCoef
+	, 5.5 -- rotorPitchChangeRate
+	, -0.3  -- rotorPitchControlMin
+	, 0.3   -- rotorPitchControlMax
+	, 0.3  -- rotorRollControlBound
+	, 0.0005 -- rotorPitchControlCoef
+	, 0.0005 -- rotorRollControlCoef
 	, {0, 0, -1} -- look offset
 	, {-1, -10, 0} -- cameraOffset
 	, -5 -- cameraSpeedCoef

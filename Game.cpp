@@ -6,6 +6,7 @@
 #include "Camera.hpp"
 #include "Skeleton.hpp"
 #include "BoneAnimation.hpp"
+#include "Banshee.hpp"
 #include "../inanity/script/lua/State.hpp"
 #ifndef ___INANITY_PLATFORM_EMSCRIPTEN
 #include "../inanity/inanity-sqlitefs.hpp"
@@ -18,223 +19,6 @@ Game* Game::singleGame = 0;
 
 const float pi = 3.1415926535897932f;
 const float gravity = -9.8f;
-
-std::string bansheeDebug;
-
-class Game::Banshee : public Object
-{
-private:
-	Game* game;
-	ptr<Physics::RigidBody> rigidBody;
-	float leftRotorForce, rightRotorForce;
-	/// Rotation angles of rotors.
-	float leftRotorAngle, rightRotorAngle;
-	/// Actual rotors' pitch.
-	float leftRotorPitch, rightRotorPitch;
-	/// Control for rotors.
-	float controlPitch, controlRoll;
-	bool controlMaxForce, controlMinForce;
-
-	vec3 leftForcePoint, rightForcePoint;
-	mat4x4 leftActualRotorTransform, rightActualRotorTransform;
-
-public:
-	Banshee(Game* game, const mat4x4& initialTransform) :
-		game(game),
-		leftRotorForce(game->bansheeParams.minRotorForce),
-		rightRotorForce(game->bansheeParams.minRotorForce),
-		leftRotorAngle(0),
-		rightRotorAngle(0),
-		leftRotorPitch(0),
-		rightRotorPitch(0),
-		controlPitch(0),
-		controlRoll(0),
-		controlMaxForce(false),
-		controlMinForce(false)
-	{
-		rigidBody = game->physicsWorld->CreateRigidBody(game->bansheeParams.shape, game->bansheeParams.mass, initialTransform);
-		rigidBody->DisableDeactivation();
-		rigidBody.StaticCast<Physics::BtRigidBody>()->GetInternalObject()->setDamping(game->bansheeParams.linearDamping, game->bansheeParams.angularDamping);
-		game->banshees.insert(this);
-	}
-
-	~Banshee()
-	{
-		game->banshees.erase(this);
-	}
-
-	mat4x4 GetTransform() const
-	{
-		return rigidBody->GetTransform();
-	}
-
-	// void Walk(const vec3& direction)
-	// {
-	// 	rigidBody->ApplyImpulse(direction, rigidBody->GetPosition());
-	// }
-
-	static float relax(float current, float target, float maxStep)
-	{
-		if(target > current)
-			return std::min(current + maxStep, target);
-		else
-			return std::max(current - maxStep, target);
-	}
-
-	void Step(float frameTime)
-	{
-		float desiredLeftRotorForce, desiredRightRotorForce;
-		if(controlMaxForce)
-		{
-			desiredLeftRotorForce = game->bansheeParams.maxRotorForce;
-			desiredRightRotorForce = game->bansheeParams.maxRotorForce;
-		}
-		else if(controlMinForce)
-		{
-			desiredLeftRotorForce = game->bansheeParams.minRotorForce;
-			desiredRightRotorForce = game->bansheeParams.minRotorForce;
-		}
-		else
-		{
-			desiredLeftRotorForce = game->bansheeParams.normalRotorForce;
-			desiredRightRotorForce = game->bansheeParams.normalRotorForce;
-		}
-
-		float desiredLeftRotorPitch = controlRoll * game->bansheeParams.rotorRollControlCoef - controlPitch * game->bansheeParams.rotorPitchControlCoef;
-		float desiredRightRotorPitch = -controlRoll * game->bansheeParams.rotorRollControlCoef - controlPitch * game->bansheeParams.rotorPitchControlCoef;
-		leftRotorPitch = relax(leftRotorPitch, desiredLeftRotorPitch, frameTime * game->bansheeParams.rotorPitchChangeRate);
-		rightRotorPitch = relax(rightRotorPitch, desiredRightRotorPitch, frameTime * game->bansheeParams.rotorPitchChangeRate);
-
-		mat4x4 transform = GetTransform();
-		leftActualRotorTransform = transform * leftRotorTransform * QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), leftRotorPitch));
-		vec4 leftRotorDir = leftActualRotorTransform * vec4(0, 0, 1, 0);
-		leftRotorDir = normalize(leftRotorDir);
-		rightActualRotorTransform = transform * rightRotorTransform * QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), rightRotorPitch));
-		vec4 rightRotorDir = rightActualRotorTransform * vec4(0, 0, 1, 0);
-		rightRotorDir = normalize(rightRotorDir);
-
-		leftRotorForce = relax(leftRotorForce, desiredLeftRotorForce, frameTime * game->bansheeParams.rotorForceChangeRate);
-		rightRotorForce = relax(rightRotorForce, desiredRightRotorForce, frameTime * game->bansheeParams.rotorForceChangeRate);
-
-		vec3 leftForce = vec3(leftRotorDir.x, leftRotorDir.y, leftRotorDir.z) * leftRotorForce;
-		leftForcePoint = vec3(leftActualRotorTransform(0, 3), leftActualRotorTransform(1, 3), leftActualRotorTransform(2, 3));
-		rigidBody->ApplyForce(leftForce, leftForcePoint);
-		vec3 rightForce = vec3(rightRotorDir.x, rightRotorDir.y, rightRotorDir.z) * rightRotorForce;
-		rightForcePoint = vec3(rightActualRotorTransform(0, 3), rightActualRotorTransform(1, 3), rightActualRotorTransform(2, 3));
-		rigidBody->ApplyForce(rightForce, rightForcePoint);
-
-		std::ostringstream s;
-		s << std::fixed << std::setprecision(3)
-			<< "leftRotorPitch: " << leftRotorPitch << " "
-			<< "rightRotorPitch: " << rightRotorPitch << " "
-			<< "(" << leftRotorDir << ") "
-			<< "(" << rightRotorDir << ") "
-			<< "(" << leftForce << ") "
-			<< "(" << rightForce << ")";
-		bansheeDebug = s.str();
-
-		leftRotorAngle += leftRotorForce * game->bansheeParams.rotorSpeed * frameTime;
-		rightRotorAngle += rightRotorForce * game->bansheeParams.rotorSpeed * frameTime;
-		while(leftRotorAngle > pi * 2)
-			leftRotorAngle -= pi * 2;
-		while(rightRotorAngle > pi * 2)
-			rightRotorAngle -= pi * 2;
-
-		// reset controls
-		controlMaxForce = false;
-	}
-
-	void Paint(Painter* painter)
-	{
-		mat4x4 transform = GetTransform();
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry, transform * mainTransform);
-
-		// left wing
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.leftWingGeometry,
-			transform *
-			leftRotorTransform *
-			QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), leftRotorPitch)));
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.rotor1Geometry,
-			transform *
-			leftRotorTransform *
-			QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), leftRotorPitch)) *
-			QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), leftRotorAngle)));
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.rotor2Geometry,
-			transform *
-			leftRotorTransform *
-			QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), leftRotorPitch)) *
-			QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), -leftRotorAngle)));
-
-		// right wing
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.rightWingGeometry,
-			transform *
-			rightRotorTransform *
-			QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), rightRotorPitch)));
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.rotor1Geometry,
-			transform *
-			rightRotorTransform *
-			QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), rightRotorPitch)) *
-			QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), rightRotorAngle)));
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.rotor2Geometry,
-			transform *
-			rightRotorTransform *
-			QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), rightRotorPitch)) *
-			QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), -rightRotorAngle)));
-
-		// TEST: look
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
-			transform *
-			CreateTranslationMatrix(game->bansheeParams.lookOffset) *
-			CreateTranslationMatrix(vec3(0.0f, 50.0f, 0.0f)) *
-			CreateScalingMatrix(vec3(0.1f, 100.0f, 0.1f)) *
-			mainTransform);
-
-		// TEST: left force
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
-			leftActualRotorTransform *
-			CreateTranslationMatrix(vec3(0.0f, 0.0f, 40.0f)) *
-			CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
-			mainTransform);
-		// TEST: right force
-		painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
-			rightActualRotorTransform *
-			CreateTranslationMatrix(vec3(0.0f, 0.0f, 40.0f)) *
-			CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
-			mainTransform);
-
-		// debug cube
-		painter->AddTransparentModel(game->debugMaterial, game->cubeGeometry, transform * CreateScalingMatrix(game->bansheeParams.cubeSize));
-	}
-
-	void SetControlPitch(float controlPitch)
-	{
-		this->controlPitch = controlPitch;
-	}
-
-	void SetControlRoll(float controlRoll)
-	{
-		this->controlRoll = controlRoll;
-	}
-
-	void SetControlMaxForce(bool controlMaxForce)
-	{
-		this->controlMaxForce = true;
-	}
-
-	void SetControlMinForce(bool controlMinForce)
-	{
-		this->controlMinForce = true;
-	}
-
-private:
-	static const mat4x4 mainTransform;
-	static const mat4x4 leftRotorTransform;
-	static const mat4x4 rightRotorTransform;
-};
-
-const mat4x4 Game::Banshee::mainTransform = CreateScalingMatrix(vec3(0.02f, 0.02f, 0.02f)) * QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), pi));
-const mat4x4 Game::Banshee::leftRotorTransform = CreateTranslationMatrix(vec3(96.0f * 0.02f, 0, 12.5f * 0.02f)) * QuaternionToMatrix(axis_rotation(vec3(0, 1, 0), -pi * 10.0f / 180.0f)) * CreateScalingMatrix(vec3(0.02f, 0.02f, 0.02f)) * QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), pi));
-const mat4x4 Game::Banshee::rightRotorTransform = CreateTranslationMatrix(vec3(-96.0f * 0.02f, 0, 12.5f * 0.02f)) * QuaternionToMatrix(axis_rotation(vec3(0, 1, 0), pi * 10.0f / 180.0f)) * CreateScalingMatrix(vec3(0.02f, 0.02f, 0.02f)) * QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), pi));
 
 Game::Game() :
 	bloomLimit(10.0f), toneLuminanceKey(0.12f), toneMaxLuminance(3.1f)
@@ -364,12 +148,11 @@ void Game::Tick()
 {
 	float frameTime = ticker.Tick();
 
-	const float maxAngleChange = frameTime * 50;
-
 	static bool cameraMode = false;
 
-	bool controlMaxForce = false, controlMinForce = false;
-	static float controlPitch = 0, controlRoll = 0;
+	Banshee::BansheeStepParams hero_step_params;
+	hero_step_params.frame_time = frameTime;
+	hero_step_params.desired_force = bansheeParams.normalRotorForce;
 
 	ptr<Input::Frame> inputFrame = inputManager->GetCurrentFrame();
 	while(inputFrame->NextEvent())
@@ -385,14 +168,14 @@ void Game::Tick()
 			{
 				switch(inputEvent.keyboard.key)
 				{
-				case 27: // escape
+				case Input::Keys::Escape: // escape
 					window->Close();
 					return;
-				case 32:
+				case Input::Keys::Space:
 					//physicsCharacter.FastCast<Physics::BtCharacter>()->GetInternalController()->jump();
 					break;
 #ifndef PRODUCTION
-				case 'M':
+				case Input::Keys::M:
 					try
 					{
 						scriptState->LoadScript(fileSystem->LoadFile("/console.lua"))->Run();
@@ -406,43 +189,43 @@ void Game::Tick()
 					}
 					break;
 
-				case 'C':
+				case Input::Keys::C:
 					cameraMode = !cameraMode;
 					break;
 
-				case '1':
+				case Input::Keys::_1:
 					bloomLimit -= 0.1f;
 					printf("bloomLimit: %f\n", bloomLimit);
 					break;
-				case '2':
+				case Input::Keys::_2:
 					bloomLimit += 0.1f;
 					printf("bloomLimit: %f\n", bloomLimit);
 					break;
-				case '3':
+				case Input::Keys::_3:
 					toneLuminanceKey -= 0.01f;
 					printf("toneLuminanceKey: %f\n", toneLuminanceKey);
 					break;
-				case '4':
+				case Input::Keys::_4:
 					toneLuminanceKey += 0.01f;
 					printf("toneLuminanceKey: %f\n", toneLuminanceKey);
 					break;
-				case '5':
+				case Input::Keys::_5:
 					toneMaxLuminance -= 0.1f;
 					printf("toneMaxLuminance: %f\n", toneMaxLuminance);
 					break;
-				case '6':
+				case Input::Keys::_6:
 					toneMaxLuminance += 0.1f;
 					printf("toneMaxLuminance: %f\n", toneMaxLuminance);
 					break;
 
-				case 'L':
+				case Input::Keys::L:
 					{
 						static bool mouseLock = true;
 						mouseLock = !mouseLock;
 						window->SetMouseLock(mouseLock);
 					}
 					break;
-				case 'V':
+				case Input::Keys::V:
 					{
 						static bool cursorVisible = false;
 						cursorVisible = !cursorVisible;
@@ -462,14 +245,15 @@ void Game::Tick()
 			case Input::Event::Mouse::typeRawMove:
 				if(cameraMode)
 				{
+					const float maxAngleChange = frameTime * 50;
 					cameraAlpha -= clamp(inputEvent.mouse.rawMoveX * 0.005f, -maxAngleChange, maxAngleChange);
 					cameraBeta -= clamp(inputEvent.mouse.rawMoveY * 0.005f, -maxAngleChange, maxAngleChange);
 					cameraAlpha -= clamp(inputEvent.mouse.rawMoveZ * 0.005f, -maxAngleChange, maxAngleChange);
 				}
 				else
 				{
-					controlPitch -= clamp(inputEvent.mouse.rawMoveY * 0.005f, -maxAngleChange, maxAngleChange);
-					controlRoll += clamp(inputEvent.mouse.rawMoveX * 0.005f, -maxAngleChange, maxAngleChange);
+					hero_step_params.pitch_delta = inputEvent.mouse.rawMoveY * bansheeParams.rotorPitchControlCoef;
+					hero_step_params.roll_delta = inputEvent.mouse.rawMoveX * bansheeParams.rotorRollControlCoef;
 				}
 				break;
 			default: break;
@@ -478,8 +262,6 @@ void Game::Tick()
 		}
 	}
 
-	controlPitch = clamp(controlPitch, bansheeParams.rotorPitchControlMin, bansheeParams.rotorPitchControlMax);
-	controlRoll = clamp(controlRoll, -bansheeParams.rotorRollControlBound, bansheeParams.rotorRollControlBound);
 
 	vec3 cameraDirection = vec3(cos(cameraAlpha) * cos(cameraBeta), sin(cameraAlpha) * cos(cameraBeta), sin(cameraBeta));
 	//vec3 cameraRightDirection = normalize(cross(cameraDirection, vec3(0, 0, 1)));
@@ -502,7 +284,10 @@ void Game::Tick()
 	{
 		cameraMove += cameraMoveDirectionFront * cameraStep;
 		if(!cameraMode)
-			controlMaxForce = true;
+		{
+			// controlMaxForce = true;
+			hero_step_params.desired_force = bansheeParams.maxRotorForce;
+		}
 	}
 	if(inputState.keyboard[39] || inputState.keyboard[68])
 		cameraMove += cameraMoveDirectionRight * cameraStep;
@@ -510,26 +295,30 @@ void Game::Tick()
 	{
 		cameraMove -= cameraMoveDirectionFront * cameraStep;
 		if(!cameraMode)
-			controlMinForce = true;
+		{
+			// controlMinForce = true;
+			hero_step_params.desired_force = bansheeParams.minRotorForce;
+		}
 	}
 	if(inputState.keyboard[81])
 		cameraMove -= cameraMoveDirectionUp * cameraStep;
 	if(inputState.keyboard[69])
 		cameraMove += cameraMoveDirectionUp * cameraStep;
 
-	// hero->Walk(cameraMove);
+	// if(controlMaxForce)
+	// 	hero->SetControlMaxForce(true);
+	// if(controlMinForce)
+	// 	hero->SetControlMinForce(true);
+	// hero->SetControlPitch(controlPitch);
+	// hero->SetControlRoll(controlRoll);
+
+	// for(Banshees::iterator i = banshees.begin(); i != banshees.end(); ++i)
+	// 	(*i)->Step(frameTime);
+
+	hero->Step(hero_step_params);
 
 	physicsWorld->Simulate(frameTime);
 
-	if(controlMaxForce)
-		hero->SetControlMaxForce(true);
-	if(controlMinForce)
-		hero->SetControlMinForce(true);
-	hero->SetControlPitch(controlPitch);
-	hero->SetControlRoll(controlRoll);
-
-	for(Banshees::iterator i = banshees.begin(); i != banshees.end(); ++i)
-		(*i)->Step(frameTime);
 
 	mat4x4 viewMatrix;
 	if(cameraMode)
@@ -547,11 +336,16 @@ void Game::Tick()
 			_camera = NEW(Camera(heroTransform, 0.1f, 8.f));
 		}
 
+		const float a = hero->getControlRoll() / bansheeParams.rotorRollControlBound;
+		const float b =
+			(hero->getControlPitch() - bansheeParams.rotorPitchControlMin) /
+			(bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin);
+
 		_camera->newTick(
 			heroTransform,
 			frameTime,
-			controlRoll / bansheeParams.rotorRollControlBound * pi / 6,
-			(controlPitch - bansheeParams.rotorPitchControlMin) / (bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin) * pi / 20 + pi/30);
+			a * pi / 6,
+			b * pi / 20 + pi/30);
 
 		cameraPosition = _camera->getCameraPosition();
 		viewMatrix = _camera->getViewMat();
@@ -563,7 +357,7 @@ void Game::Tick()
 	int screenHeight = presenter->GetHeight();
 	painter->Resize(screenWidth, screenHeight);
 
-	mat4x4 projMatrix = CreateProjectionPerspectiveFovMatrix(3.1415926535897932f / 4, float(screenWidth) / float(screenHeight), 0.1f, 100.0f);
+	mat4x4 projMatrix = CreateProjectionPerspectiveFovMatrix(3.1415926535897932f / 4, float(screenWidth) / float(screenHeight), 0.1f, 10000.0f);
 
 	// зарегистрировать все объекты
 	painter->BeginFrame(frameTime);
@@ -620,8 +414,9 @@ void Game::Tick()
 		sprintf(fpsString, "frameTime: %.6f sec, FPS: %.6f", lastAllTicksTime / needTickCount, needTickCount / lastAllTicksTime);
 
 		font->DrawString(canvas, fpsString, vec2(20.0f, (float)screenHeight - 20.0f), vec4(1, 0, 0, 1));
-		font->DrawString(canvas, bansheeDebug, vec2(20.0f, (float)screenHeight - 40.0f), vec4(0, 1, 0, 1));
+		font->DrawString(canvas, Banshee::bansheeDebug, vec2(20.0f, (float)screenHeight - 40.0f), vec4(0, 1, 0, 1));
 
+		#if 0
 		// normal control
 
 		font->DrawString(canvas, "XXX", vec2(
@@ -634,13 +429,14 @@ void Game::Tick()
 			), vec4(1, 1, 1, 1), Gui::Font::textOriginCenter | Gui::Font::textOriginMiddle);
 		// actual control
 		font->DrawString(canvas, "XXX", vec2(
-			(float)screenWidth * (1 + controlRoll / bansheeParams.rotorRollControlBound) * 0.5f,
-			(float)screenHeight * (1 - (controlPitch - bansheeParams.rotorPitchControlMin) / (bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin)) - 1.0f
+			(float)screenWidth * (1 + hero->getControlRoll() / bansheeParams.rotorRollControlBound) * 0.5f,
+			(float)screenHeight * (1 - (hero->getControlPitch() - bansheeParams.rotorPitchControlMin) / (bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin)) - 1.0f
 			), vec4(0, 0, 0, 1), Gui::Font::textOriginCenter | Gui::Font::textOriginMiddle);
 		font->DrawString(canvas, "XXX", vec2(
-			(float)screenWidth * (1 + controlRoll / bansheeParams.rotorRollControlBound) * 0.5f,
-			(float)screenHeight * (1 - (controlPitch - bansheeParams.rotorPitchControlMin) / (bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin))
+			(float)screenWidth * (1 + hero->getControlRoll() / bansheeParams.rotorRollControlBound) * 0.5f,
+			(float)screenHeight * (1 - (hero->getControlPitch() - bansheeParams.rotorPitchControlMin) / (bansheeParams.rotorPitchControlMax - bansheeParams.rotorPitchControlMin))
 			), vec4(1, 1, 1, 1), Gui::Font::textOriginCenter | Gui::Font::textOriginMiddle);
+		#endif
 
 		canvas->Flush();
 	}

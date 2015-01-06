@@ -65,7 +65,19 @@ exports.configureLinker = function(executableFile, linker) {
 	var a = /^(([^\/]+)\/)[^\/]+$/.exec(executableFile);
 	linker.configuration = a[2];
 
-	var objects = ['main', 'meta', 'Geometry', 'GeometryFormats', 'Material', 'Painter', 'Game', 'BoneAnimation', 'Skeleton', 'Camera'];
+	var objects = [
+		'main',
+		'meta',
+		'Geometry',
+		'GeometryFormats',
+		'Material',
+		'Painter',
+		'Game',
+		'BoneAnimation',
+		'Skeleton',
+		'Camera',
+		'Banshee'];
+
 	for ( var i = 0; i < objects.length; ++i)
 		linker.addObjectFile(a[1] + objects[i]);
 
