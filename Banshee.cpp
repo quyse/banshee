@@ -13,17 +13,17 @@ const float pi = 3.1415926535897932f;
 
 std::string Game::Banshee::bansheeDebug;
 
-const mat4x4 Game::Banshee::mainTransform =
+mat4x4 Game::Banshee::mainTransform =
 	CreateScalingMatrix(vec3(0.02f, 0.02f, 0.02f)) *
 	QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), pi));
 
-const mat4x4 Game::Banshee::leftRotorTransform =
+mat4x4 Game::Banshee::leftRotorTransform =
 	CreateTranslationMatrix(vec3(96.0f * 0.02f, 0, 12.5f * 0.02f)) *
 	QuaternionToMatrix(axis_rotation(vec3(0, 1, 0), -pi * 10.0f / 180.0f)) *
 	CreateScalingMatrix(vec3(0.02f, 0.02f, 0.02f)) *
 	QuaternionToMatrix(axis_rotation(vec3(0, 0, 1), pi));
 
-const mat4x4 Game::Banshee::rightRotorTransform =
+mat4x4 Game::Banshee::rightRotorTransform =
 	CreateTranslationMatrix(vec3(-96.0f * 0.02f, 0, 12.5f * 0.02f)) *
 	QuaternionToMatrix(axis_rotation(vec3(0, 1, 0), pi * 10.0f / 180.0f)) *
 	CreateScalingMatrix(vec3(0.02f, 0.02f, 0.02f)) *
@@ -143,6 +143,19 @@ void Game::Banshee::Step(const BansheeStepParams step_params)
 	rigidBody->ApplyForce(leftForce, leftForcePoint);
 	rigidBody->ApplyForce(rightForce, rightForcePoint);
 
+	// std::cout << "origin position: " << vec3(transform(0, 3), transform(1, 3), transform(2, 3)) << std::endl;
+
+	#if 0
+	const vec3 world_pivot(50,50,50);
+
+	// const vec3 some_force = normalize(world_pivot - rightForcePoint) * (1500.f);
+	vec3 some_force = world_pivot - rightForcePoint;
+	some_force *= (length(some_force) * 10.f + 300.f) / length(some_force);
+
+	rigidBody->ApplyForce(some_force, rightForcePoint);
+	// rigidBody->ApplyForce(some_force, vec3(transform(0, 3), transform(1, 3), transform(2, 3)));
+	#endif
+
 	std::ostringstream s;
 	s << std::fixed << std::setprecision(3)
 		<< "left_pitch: " << left_pitch << " "
@@ -212,19 +225,62 @@ void Game::Banshee::Paint(Painter* painter)
 		CreateScalingMatrix(vec3(0.1f, 100.0f, 0.1f)) *
 		mainTransform);
 
-	// TEST: left force
-	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
-		leftActualRotorTransform *
-		CreateTranslationMatrix(vec3(0.0f, 0.0f, 60.0f)) *
-		CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
-		mainTransform);
+	// // TEST: left force
+	// painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
+	// 	leftActualRotorTransform *
+	// 	CreateTranslationMatrix(vec3(0.0f, 0.0f, 60.0f)) *
+	// 	CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
+	// 	mainTransform);
+
 	// TEST: right force
 	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
 		rightActualRotorTransform *
 		CreateTranslationMatrix(vec3(0.0f, 0.0f, 60.0f)) *
 		CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
 		mainTransform);
+	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
+		rightActualRotorTransform *
+		QuaternionToMatrix(axis_rotation(vec3(1, 0, 0), 1.0f)) *
+		CreateTranslationMatrix(vec3(0.0f, 0.0f, 60.0f)) *
+		CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
+		mainTransform);
+	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
+		rightActualRotorTransform *
+		QuaternionToMatrix(axis_rotation(vec3(0, 1, 0), 1.0f)) *
+		CreateTranslationMatrix(vec3(0.0f, 0.0f, 60.0f)) *
+		CreateScalingMatrix(vec3(0.5f, 0.5f, 50.0f)) *
+		mainTransform);
+
+	// TEST
+	#if 1
+	const vec3 world_pivot(50,50,50);
+
+	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
+		CreateTranslationMatrix(vec3(50,50,50)) *
+		CreateScalingMatrix(vec3(0.05f, 0.05f, 1.0f)) *
+		mainTransform);
+
+	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
+		CreateTranslationMatrix(vec3(50,50,50)) *
+		CreateScalingMatrix(vec3(0.05f, 1.0f, 0.05f)) *
+		mainTransform);
+
+	painter->AddModel(game->bansheeParams.material, game->bansheeParams.mainGeometry,
+		CreateTranslationMatrix(vec3(50,50,50)) *
+		CreateScalingMatrix(vec3(1.0f, 0.05f, 0.005f)) *
+		mainTransform);
+
+	#endif
 
 	// debug cube
 	painter->AddTransparentModel(game->debugMaterial, game->cubeGeometry, transform * CreateScalingMatrix(game->bansheeParams.cubeSize));
+}
+
+// static
+void Game::Banshee::moveMassCenter(const vec3 move)
+{
+	const mat4x4 translation = CreateTranslationMatrix(-move);
+	mainTransform = translation * mainTransform;
+	leftRotorTransform = translation * leftRotorTransform;
+	rightRotorTransform = translation * rightRotorTransform;
 }

@@ -580,6 +580,7 @@ void Game::SetBansheeParams(
 	ptr<Geometry> rotor2Geometry,
 	ptr<Material> material,
 	ptr<Physics::Shape> shape,
+	const vec3& bansheeMassCenter,
 	float mass,
 	float linearDamping,
 	float angularDamping,
@@ -607,6 +608,9 @@ void Game::SetBansheeParams(
 	bansheeParams.rotor2Geometry = rotor2Geometry;
 	bansheeParams.material = material;
 	bansheeParams.shape = shape;
+
+	Banshee::moveMassCenter(bansheeMassCenter);
+
 	bansheeParams.mass = mass;
 	bansheeParams.linearDamping = linearDamping;
 	bansheeParams.angularDamping = angularDamping;

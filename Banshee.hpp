@@ -58,6 +58,8 @@ public:
 		return controlRoll;
 	}
 
+	static void moveMassCenter(const vec3 move);
+
 private:
 	Game* game;
 	ptr<Physics::RigidBody> rigidBody;
@@ -86,9 +88,9 @@ private:
 		return control_pitch - control_roll;
 	}
 
-	static const mat4x4 mainTransform;
-	static const mat4x4 leftRotorTransform;
-	static const mat4x4 rightRotorTransform;
+	static mat4x4 mainTransform;
+	static mat4x4 leftRotorTransform;
+	static mat4x4 rightRotorTransform;
 };
 
 

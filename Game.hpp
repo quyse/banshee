@@ -182,6 +182,7 @@ public:
 		ptr<Geometry> rotor2Geometry,
 		ptr<Material> material,
 		ptr<Physics::Shape> shape,
+		const vec3& bansheeMassCenter,
 		float mass,
 		float linearDamping,
 		float angularDamping,

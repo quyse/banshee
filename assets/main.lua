@@ -126,15 +126,20 @@ bansheeMaterial:SetSpecular({1, 0, 0, 0})
 local bansheeCubeSize = {1,1,1}
 
 local s = 0.02
-local s2 = 0.01
+local s2 = s / 2;
+
+local banshee_mass_center_x = 0;
+local banshee_mass_center_y = 10 * s;
+local banshee_mass_center_z = -60 * s;
+
 local bansheeShape = game:CreatePhysicsCompoundShape({
-	{       0,   -177 * s,    -13 * s, game:CreatePhysicsBoxShape({    120 * s2,     37 * s2,     55 * s2}) },
-	{       0,   -128 * s,    -13 * s, game:CreatePhysicsBoxShape({     30 * s2,    127 * s2,     17 * s2}) },
-	{       0,     -2 * s,    -46 * s, game:CreatePhysicsBoxShape({    200 * s2,     48 * s2,     40 * s2}) },
-	{       0,     50 * s,    -62 * s, game:CreatePhysicsBoxShape({    112 * s2,     66 * s2,     30 * s2}) },
-	{       0,    -16 * s,    -23 * s, game:CreatePhysicsBoxShape({     75 * s2,    144 * s2,     55 * s2}) },
-	{  98 * s,          0,     12 * s, game:CreatePhysicsBoxShape({     74 * s2,     83 * s2,     35 * s2}) },
-	{ -98 * s,          0,     12 * s, game:CreatePhysicsBoxShape({     74 * s2,     83 * s2,     35 * s2}) }
+	{       0 - banshee_mass_center_x,   -177 * s - banshee_mass_center_y,    -13 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({    120 * s2,     37 * s2,     55 * s2}) },
+	{       0 - banshee_mass_center_x,   -128 * s - banshee_mass_center_y,    -13 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({     30 * s2,    127 * s2,     17 * s2}) },
+	{       0 - banshee_mass_center_x,     -2 * s - banshee_mass_center_y,    -46 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({    200 * s2,     48 * s2,     40 * s2}) },
+	{       0 - banshee_mass_center_x,     50 * s - banshee_mass_center_y,    -62 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({    112 * s2,     66 * s2,     30 * s2}) },
+	{       0 - banshee_mass_center_x,    -16 * s - banshee_mass_center_y,    -23 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({     75 * s2,    144 * s2,     55 * s2}) },
+	{  98 * s - banshee_mass_center_x,          0 - banshee_mass_center_y,     12 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({     74 * s2,     83 * s2,     35 * s2}) },
+	{ -98 * s - banshee_mass_center_x,          0 - banshee_mass_center_y,     12 * s - banshee_mass_center_z, game:CreatePhysicsBoxShape({     74 * s2,     83 * s2,     35 * s2}) }
 	})
 
 -- local bansheeShape = game:CreatePhysicsCompoundShape({
@@ -154,6 +159,7 @@ game:SetBansheeParams(bansheeMainGeometry
 	, bansheeRotor2Geometry
 	, bansheeMaterial
 	, bansheeShape
+	, {banshee_mass_center_x, banshee_mass_center_y, banshee_mass_center_z} -- banshee mass center
 	, 9 -- mass
 	, 0.2 -- linear damping
 	, 0.2 -- angular damping
