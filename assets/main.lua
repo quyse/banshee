@@ -33,17 +33,24 @@ game:AddStaticModel(game:LoadGeometry("/nescafe.geo"), matNescafe, { 2, 0, 0 })
 local geoCube = game:LoadGeometry("/box.geo")
 game:SetCubeGeometry(geoCube)
 local shapeCube = game:CreatePhysicsBoxShape({ 1, 1, 1 })
-game:AddStaticRigidBody(game:CreatePhysicsRigidBody(game:CreatePhysicsBoxShape({ 10, 10, 1 }), 0, { 11, 11, -1 }))
-for i = 1, 10 do
-	for j = 1, 10 do
-		game:AddStaticModel(geoCube, matCube, { i * 2, j * 2, -1 })
+
+for i = -10, 10 do
+	for j = -10, 10 do
+		game:AddStaticModel(geoCube, matCube, { i * 20, j * 20, -1 })
 	end
 end
 
 local matFloor = Banshee.Material()
 matFloor:SetDiffuseTexture(game:LoadTexture("/floor.png"))
-game:AddStaticRigidBody(game:CreatePhysicsRigidBody(game:CreatePhysicsBoxShape({ 100, 100, 1 }), 0, { 0, 0, 0}))
-game:AddStaticModelWithScale(geoCube, matFloor, { 0, 0, 0 }, { 100, 100, 1 })
+
+-- floor
+game:AddStaticRigidBody(game:CreatePhysicsRigidBody(game:CreatePhysicsBoxShape({ 10000, 10000, 1 }), 0, { 0, 0, -1}))
+game:AddStaticModelWithScale(geoCube, matFloor, { 0, 0, -1 }, { 10000, 10000, 1 })
+
+-- -- ceil
+-- game:AddStaticRigidBody(game:CreatePhysicsRigidBody(game:CreatePhysicsBoxShape({ 10000, 10000, 1 }), 0, { 0, 0, 101 }))
+-- game:AddStaticModelWithScale(geoCube, matFloor, { 0, 0, 101 }, { 10000, 10000, 1 })
+
 --[[ 8x8x4 (256) ok, 9x9x4 (324) not, 10x10x3 (300) ok, 7x7x5 (245) ok, 8x8x5 (320) not
 for i = 1, 4 do
 for j = 1, 4 do
@@ -67,6 +74,12 @@ light2:SetPosition({30, -10, 20})
 light2:SetTarget({11, 11, 0})
 light2:SetProjection(45, 0.1, 100)
 light2:SetShadow(true)
+
+local light3 = game:AddStaticLight()
+light3:SetPosition({-300, -100, 200})
+light3:SetTarget({11, 11, 0})
+light3:SetProjection(180, 0.1, 100)
+light3:SetShadow(true)
 
 -- установка параметров
 
@@ -111,12 +124,29 @@ bansheeMaterial:SetDiffuseTexture(game:LoadTexture("/banshee.png"))
 -- bansheeMaterial:SetDiffuse({0.5, 0.5, 0.5, 1});
 bansheeMaterial:SetSpecular({1, 0, 0, 0})
 local bansheeCubeSize = {1,1,1}
+
+local s = 0.02
+local s2 = 0.01
 local bansheeShape = game:CreatePhysicsCompoundShape({
-	{ 0, 0, 0, game:CreatePhysicsBoxShape({1,1,1}) },
-	{ 1, 0, 0, game:CreatePhysicsBoxShape({1,1,0.5}) },
-	{ -1, 0, 0, game:CreatePhysicsBoxShape({1,1,0.5}) }
+	{       0,   -177 * s,    -13 * s, game:CreatePhysicsBoxShape({    120 * s2,     37 * s2,     55 * s2}) },
+	{       0,   -128 * s,    -13 * s, game:CreatePhysicsBoxShape({     30 * s2,    127 * s2,     17 * s2}) },
+	{       0,     -2 * s,    -46 * s, game:CreatePhysicsBoxShape({    200 * s2,     48 * s2,     40 * s2}) },
+	{       0,     50 * s,    -62 * s, game:CreatePhysicsBoxShape({    112 * s2,     66 * s2,     30 * s2}) },
+	{       0,    -16 * s,    -23 * s, game:CreatePhysicsBoxShape({     75 * s2,    144 * s2,     55 * s2}) },
+	{  98 * s,          0,     12 * s, game:CreatePhysicsBoxShape({     74 * s2,     83 * s2,     35 * s2}) },
+	{ -98 * s,          0,     12 * s, game:CreatePhysicsBoxShape({     74 * s2,     83 * s2,     35 * s2}) }
 	})
--- local bansheeShape = game:CreatePhysicsSphereShape(1)
+
+-- local bansheeShape = game:CreatePhysicsCompoundShape({
+-- 	{ 10, 0, -1, game:CreatePhysicsBoxShape({4,4,4}) },
+-- 	{ 1, 0, 0, game:CreatePhysicsBoxShape({1,1,0.5}) },
+-- 	{ -1, 0, 0, game:CreatePhysicsBoxShape({1,1,0.5}) }
+-- 	})
+
+-- local bansheeShape = game:CreatePhysicsSphereShape(3)
+
+-- local bansheeShape = game:CreatePhysicsBoxShape({5, 5, 0.0000005})
+
 game:SetBansheeParams(bansheeMainGeometry
 	, bansheeLeftWingGeometry
 	, bansheeRightWingGeometry
@@ -126,16 +156,16 @@ game:SetBansheeParams(bansheeMainGeometry
 	, bansheeShape
 	, 9 -- mass
 	, 0.2 -- linear damping
-	, 0.9 -- angular damping
+	, 0.2 -- angular damping
 	, 1 -- rotorSpeed
 	, 30 -- min rotor force
-	, 44 -- normal rotor force
-	, 90 -- max rotor force
+	, 40 -- normal rotor force
+	, 70 -- max rotor force
 	, 20 -- rotorForceChangeRate
 	, 5.5 -- rotorPitchChangeRate
 	, -0.3  -- rotorPitchControlMin
 	, 0.3   -- rotorPitchControlMax
-	, 0.3  -- rotorRollControlBound
+	, 1.3  -- rotorRollControlBound
 	, 0.0005 -- rotorPitchControlCoef
 	, 0.0005 -- rotorRollControlCoef
 	, {0, 0, -1} -- look offset

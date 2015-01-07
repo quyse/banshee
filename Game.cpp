@@ -305,6 +305,10 @@ void Game::Tick()
 	if(inputState.keyboard[69])
 		cameraMove += cameraMoveDirectionUp * cameraStep;
 
+
+	physicsWorld->Simulate(frameTime);
+
+
 	// if(controlMaxForce)
 	// 	hero->SetControlMaxForce(true);
 	// if(controlMinForce)
@@ -316,8 +320,6 @@ void Game::Tick()
 	// 	(*i)->Step(frameTime);
 
 	hero->Step(hero_step_params);
-
-	physicsWorld->Simulate(frameTime);
 
 
 	mat4x4 viewMatrix;
@@ -357,7 +359,7 @@ void Game::Tick()
 	int screenHeight = presenter->GetHeight();
 	painter->Resize(screenWidth, screenHeight);
 
-	mat4x4 projMatrix = CreateProjectionPerspectiveFovMatrix(3.1415926535897932f / 4, float(screenWidth) / float(screenHeight), 0.1f, 10000.0f);
+	mat4x4 projMatrix = CreateProjectionPerspectiveFovMatrix(pi / 4, float(screenWidth) / float(screenHeight), 0.1f, 10000.0f);
 
 	// зарегистрировать все объекты
 	painter->BeginFrame(frameTime);
