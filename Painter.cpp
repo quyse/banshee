@@ -230,6 +230,8 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 
 	shadowSamplerState = device->CreateSamplerState(shadowSamplerSettings);
 
+	dssNormal = device->CreateDepthStencilState();
+	dssNormal->SetDepthTest(DepthStencilState::testFuncLess, true);
 	dssFull = device->CreateDepthStencilState();
 	dssFull->SetDepthTest(DepthStencilState::testFuncAlways, false);
 
@@ -978,7 +980,7 @@ void Painter::Draw()
 	{
 		Context::LetFrameBuffer lfb(context, fbOpaque);
 		Context::LetViewport lv(context, screenWidth, screenHeight);
-		Context::LetDepthStencilState ldss(context, nullptr);
+		Context::LetDepthStencilState ldss(context, dssNormal);
 		Context::LetUniformBuffer lubCamera(context, ugCamera);
 
 		// установить uniform'ы камеры

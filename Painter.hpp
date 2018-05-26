@@ -278,6 +278,8 @@ private:
 	ptr<DepthStencilBuffer> dsbDepth;
 	/// Буфер глубины для карт теней.
 	ptr<DepthStencilBuffer> dsbShadow;
+	/// Depth-stencil для 3D;
+	ptr<DepthStencilState> dssNormal;
 	/// Depth-stencil для полноэкранных эффектов.
 	ptr<DepthStencilState> dssFull;
 	/// Карты теней.
