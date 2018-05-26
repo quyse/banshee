@@ -102,7 +102,7 @@ void Game::Run()
 			ptr<Gui::FontFace> fontFace = fontEngine->LoadFontFace(fileSystem->LoadFile("/DejaVuSans.ttf"));
 			const int fontSize = 13;
 			ptr<Gui::FontShape> fontShape = fontFace->CreateShape(fontSize);
-			ptr<Gui::FontGlyphs> fontGlyphs = fontFace->CreateGlyphs(canvas, fontSize);
+			ptr<Gui::FontGlyphs> fontGlyphs = fontFace->CreateGlyphs(canvas, fontSize, {});
 			font = NEW(Gui::Font(fontShape, fontGlyphs));
 		}
 
@@ -258,6 +258,8 @@ void Game::Tick()
 				break;
 			default: break;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -415,8 +417,8 @@ void Game::Tick()
 		char fpsString[64];
 		sprintf(fpsString, "frameTime: %.6f sec, FPS: %.6f", lastAllTicksTime / needTickCount, needTickCount / lastAllTicksTime);
 
-		font->DrawString(canvas, fpsString, vec2(20.0f, (float)screenHeight - 20.0f), vec4(1, 0, 0, 1));
-		font->DrawString(canvas, Banshee::bansheeDebug, vec2(20.0f, (float)screenHeight - 40.0f), vec4(0, 1, 0, 1));
+		font->DrawString(canvas, fpsString, (uint32_t)'Zyyy', vec2(20.0f, (float)screenHeight - 20.0f), vec4(1, 0, 0, 1));
+		font->DrawString(canvas, Banshee::bansheeDebug, (uint32_t)'Zyyy', vec2(20.0f, (float)screenHeight - 40.0f), vec4(0, 1, 0, 1));
 
 		#if 0
 		// normal control

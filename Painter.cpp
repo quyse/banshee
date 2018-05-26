@@ -230,6 +230,9 @@ Painter::Painter(ptr<Device> device, ptr<Context> context, ptr<Presenter> presen
 
 	shadowSamplerState = device->CreateSamplerState(shadowSamplerSettings);
 
+	dssFull = device->CreateDepthStencilState();
+	dssFull->SetDepthTest(DepthStencilState::testFuncAlways, false);
+
 	// геометрия полноэкранного прохода
 	struct Quad
 	{
@@ -924,8 +927,7 @@ void Painter::Draw()
 				Context::LetIndexBuffer lib(context, ibFilter);
 				Context::LetVertexShader lvs(context, vsFilter);
 				Context::LetPixelShader lps(context, psShadowBlur);
-				Context::LetDepthTestFunc ldtf(context, Context::depthTestFuncAlways);
-				Context::LetDepthWrite ldw(context, false);
+				Context::LetDepthStencilState ldss(context, dssFull);
 
 				// первый проход
 
@@ -976,8 +978,7 @@ void Painter::Draw()
 	{
 		Context::LetFrameBuffer lfb(context, fbOpaque);
 		Context::LetViewport lv(context, screenWidth, screenHeight);
-		Context::LetDepthTestFunc ldtf(context, Context::depthTestFuncLess);
-		Context::LetDepthWrite ldw(context, true);
+		Context::LetDepthStencilState ldss(context, nullptr);
 		Context::LetUniformBuffer lubCamera(context, ugCamera);
 
 		// установить uniform'ы камеры
@@ -1026,8 +1027,7 @@ void Painter::Draw()
 			Context::LetVertexBuffer lvb(context, 0, vbFilter);
 			Context::LetIndexBuffer lib(context, ibFilter);
 			Context::LetVertexShader lvs(context, vsFilter);
-			Context::LetDepthTestFunc ldtf(context, Context::depthTestFuncAlways);
-			Context::LetDepthWrite ldw(context, false);
+			Context::LetDepthStencilState ldss(context, dssFull);
 
 			Context::LetUniformBuffer lubCamera(context, ugCamera);
 			Context::LetSampler lsBackground(context, uBackgroundSampler, backgroundTexture, ssColorTexture);
@@ -1237,8 +1237,7 @@ void Painter::Draw()
 		Context::LetVertexBuffer lvb(context, 0, vbFilter);
 		Context::LetIndexBuffer lib(context, ibFilter);
 		Context::LetVertexShader lvs(context, vsFilter);
-		Context::LetDepthTestFunc ldtf(context, Context::depthTestFuncAlways);
-		Context::LetDepthWrite ldw(context, false);
+		Context::LetDepthStencilState ldss(context, dssFull);
 
 		// downsampling
 		/*
