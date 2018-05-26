@@ -43,8 +43,10 @@ var staticDepsLibraries = [
 	{ dir: 'sqlite', lib: 'libsqlite', platform: 'win32' },
 	{ dir: 'sqlite', lib: 'libsqlite', platform: 'linux' },
 	{ dir: 'sqlite', lib: 'libsqlite', platform: 'freebsd' },
+	{ dir: 'harfbuzz', lib: 'libharfbuzz' },
 	{ dir: 'freetype', lib: 'libfreetype' },
-	{ dir: 'harfbuzz', lib: 'libharfbuzz' }
+	{ dir: 'ucdn', lib: 'libucdn' },
+	{ dir: 'icu', lib: 'libicu' },
 ];
 var dynamicLibraries = {
 	win32: [
